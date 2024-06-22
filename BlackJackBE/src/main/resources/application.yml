@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://c7u1tn6bvvsodf.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com:5432/d5upvpmkirn45i
+    username: u4va6ldtlh0cd6
+    password: pdd37f16d8ae735539c81f4f525d4e3ce309b0aa9455f85bc96a7d322ee05913e
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: true
+    generate-ddl: true
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+server:
+  port: 8080
+  error:
+    include-message: always
+security:
+    secret-key: "c11a7a92006ae9322bf336606a7311846c5847f2d5556f43952eea886f4d5655"

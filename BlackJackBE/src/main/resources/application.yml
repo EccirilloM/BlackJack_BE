@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://c7u1tn6bvvsodf.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com:5432/d5upvpmkirn45i
-    username: u4va6ldtlh0cd6
-    password: pdd37f16d8ae735539c81f4f525d4e3ce309b0aa9455f85bc96a7d322ee05913e
+    url: jdbc:postgresql://c7u1tn6bvvsodf.cluster-czz5s0kz4scl.eu-west-1.rds.amazonaws.com:5432/dbj9ocrt4mvbfj
+    username: u695s0atmefjmn
+    password: pa1ba9195a9d00c7e33ec3236d8c3fb587f66c3801d03fbd61db9e54e5f1372b3
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

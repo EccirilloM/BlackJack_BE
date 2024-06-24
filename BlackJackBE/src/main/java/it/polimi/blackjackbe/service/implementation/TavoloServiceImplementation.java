@@ -4,6 +4,7 @@ import it.polimi.blackjackbe.builder.ManoBuilder;
 import it.polimi.blackjackbe.dto.request.EndTavoloRequest;
 import it.polimi.blackjackbe.dto.response.CartaResponse;
 import it.polimi.blackjackbe.exception.BadRequestException;
+import it.polimi.blackjackbe.exception.NotFoundException;
 import it.polimi.blackjackbe.model.*;
 import it.polimi.blackjackbe.repository.ManoRepository;
 import it.polimi.blackjackbe.repository.TavoloRepository;
@@ -35,7 +36,7 @@ public class TavoloServiceImplementation implements TavoloService {
      * Inizializza un nuovo tavolo per l'utente specificato.
      *
      * @param tipoTavolo Tipo del tavolo da inizializzare.
-     * @param userId ID dell'utente che inizializza il tavolo.
+     * @param userId     ID dell'utente che inizializza il tavolo.
      * @throws BadRequestException se l'ID dell'utente o il tipo del tavolo non sono validi.
      */
     @Override
@@ -67,7 +68,7 @@ public class TavoloServiceImplementation implements TavoloService {
     /**
      * Termina il tavolo per l'utente specificato.
      *
-     * @param userId ID dell'utente che termina il tavolo.
+     * @param userId  ID dell'utente che termina il tavolo.
      * @param request Richiesta contenente i dati per terminare il tavolo.
      * @throws BadRequestException se l'utente o il tavolo non vengono trovati.
      */
@@ -93,7 +94,7 @@ public class TavoloServiceImplementation implements TavoloService {
     /**
      * Fornisce lo stato corrente del tavolo e altre informazioni rilevanti.
      *
-     * @param tavolo Tavolo di cui ottenere lo stato.
+     * @param tavolo       Tavolo di cui ottenere lo stato.
      * @param tavoloStatus Stato attuale del tavolo.
      * @return Un oggetto TavoloStatusResponse contenente le informazioni sullo stato del tavolo.
      */
@@ -118,7 +119,7 @@ public class TavoloServiceImplementation implements TavoloService {
      *
      * @param userId ID dell'utente di cui recuperare il tavolo.
      * @return Un oggetto Tavolo associato all'utente specificato.
-     * @throws BadRequestException se l'utente non viene trovato.
+     * @throws BadRequestException   se l'utente non viene trovato.
      * @throws IllegalStateException se la mano non è stata distribuita.
      */
     public Tavolo getTavolo(Long userId) {
@@ -141,7 +142,7 @@ public class TavoloServiceImplementation implements TavoloService {
     /**
      * Processa la vincita del giocatore per il tavolo specificato.
      *
-     * @param tavolo Tavolo di cui processare la vincita.
+     * @param tavolo       Tavolo di cui processare la vincita.
      * @param tavoloStatus Stato del tavolo dopo la partita.
      */
     public void processWin(Tavolo tavolo, TavoloStatus tavoloStatus) {
@@ -151,33 +152,57 @@ public class TavoloServiceImplementation implements TavoloService {
     /**
      * Processa la vincita del giocatore per il tavolo specificato, con un'opzione per il blackjack.
      *
-     * @param tavolo Tavolo di cui processare la vincita.
+     * @param tavolo       Tavolo di cui processare la vincita.
      * @param tavoloStatus Stato del tavolo dopo la partita.
-     * @param blackJack Indica se il giocatore ha vinto con un blackjack.
+     * @param blackJack    Indica se il giocatore ha vinto con un blackjack.
      */
     public void processWin(Tavolo tavolo, TavoloStatus tavoloStatus, boolean blackJack) {
+        // Verifica che il tavolo non sia nullo.
+        if (tavolo == null) {
+            throw new BadRequestException("Tavolo non può essere null");
+        }
+
         // Recupera l'utente associato al tavolo e l'amministratore dal repository.
-        User user = userRepository.findById(tavolo.getPlayer().getUserId()).get();
-        User admin = userRepository.findByRuolo(Ruolo.ADMIN).get();
+        User user = userRepository.findById(tavolo.getPlayer().getUserId())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        User admin = userRepository.findByRuolo(Ruolo.ADMIN)
+                .orElseThrow(() -> new NotFoundException("Admin not found"));
+
         Double importo = 0.0;
+
+        // Log iniziale dei saldi
+        System.out.println("Initial User Saldo: " + user.getSaldo());
+        System.out.println("Initial Admin Saldo: " + admin.getSaldo());
 
         // Calcola le vincite e aggiorna i saldi in base allo stato del tavolo.
         if (tavoloStatus == TavoloStatus.PLAYER_WIN) {
-            // Se il giocatore ha vinto, calcola la vincita in base alla puntata dell'utente.
-            // Se il giocatore ha vinto con un blackjack, la vincita è 2.5 volte la puntata, altrimenti è 2 volte.
-            Double vincita = tavolo.getPlotUser() * (blackJack ? 2.5 : 2);
-            user.setSaldo(user.getSaldo() + vincita); // Aggiunge la vincita al saldo dell'utente.
-            admin.setSaldo(admin.getSaldo() - vincita); // Sottrae la vincita dal saldo dell'amministratore.
-            tavolo.setTotalWinning(tavolo.getTotalWinning() + vincita); // Aggiorna le vincite totali del tavolo.
-            importo = -vincita / 2; // Imposta l'importo per la registrazione della mano.
+            // Se il giocatore ha vinto, calcola la vincita netta in base alla puntata dell'utente.
+            Double rate = blackJack ? 2.5 : 2.0;
+            Double vincitaNetta = tavolo.getPlotUser() * rate; // Vincita totale del giocatore
+            Double totaleDaPagareDalCasino = tavolo.getPlotUser() * (rate - 1); // Totale da pagare dal casinò
+
+            user.setSaldo(user.getSaldo() + vincitaNetta); // Aggiunge la vincita al saldo dell'utente.
+            admin.setSaldo(admin.getSaldo() - totaleDaPagareDalCasino); // Sottrae solo la vincita netta dal saldo dell'amministratore.
+            tavolo.setTotalWinning(tavolo.getTotalWinning() + vincitaNetta); // Aggiorna le vincite totali del tavolo.
+            importo = -totaleDaPagareDalCasino / 2; // Imposta l'importo per la registrazione della mano.
+
+            // Log della vincita del giocatore
+            System.out.println("Player won. Winning Amount: " + vincitaNetta);
         } else if (tavoloStatus == TavoloStatus.PLAYER_LOSE) {
-            // Se il giocatore ha perso, la puntata dell'utente viene aggiunta al saldo dell'amministratore.
-            admin.setSaldo(admin.getSaldo() + tavolo.getPlotUser());
+            // Se il giocatore ha perso, la puntata dell'utente è già stata sottratta nel metodo `deal`,
+            // quindi dobbiamo solo aggiornare il saldo dell'amministratore.
+            admin.setSaldo(admin.getSaldo() + tavolo.getPlotUser()); // Incrementa il saldo dell'admin
             tavolo.setTotalWinning(tavolo.getTotalWinning() - tavolo.getPlotUser()); // Aggiorna le vincite totali del tavolo.
             importo = tavolo.getPlotUser(); // Imposta l'importo per la registrazione della mano.
+
+            // Log della perdita del giocatore
+            System.out.println("Player lost. Betting Amount: " + tavolo.getPlotUser());
         } else if (tavoloStatus == TavoloStatus.DRAW) {
             // Se la partita è in pareggio, la puntata dell'utente viene restituita al saldo dell'utente.
             user.setSaldo(user.getSaldo() + tavolo.getPlotUser());
+
+            // Log del pareggio
+            System.out.println("It's a draw. Returned Betting Amount: " + tavolo.getPlotUser());
         }
 
         // Registra la mano nel database.
@@ -187,5 +212,13 @@ public class TavoloServiceImplementation implements TavoloService {
                 .importo(importo)
                 .build();
         manoRepository.save(mano);
+
+        // Salva le modifiche ai saldi dell'utente e dell'admin nel database.
+        userRepository.save(user);
+        userRepository.save(admin);
+
+        // Log finale dei saldi
+        System.out.println("Final User Saldo: " + user.getSaldo());
+        System.out.println("Final Admin Saldo: " + admin.getSaldo());
     }
 }
